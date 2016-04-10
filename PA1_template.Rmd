@@ -1,0 +1,123 @@
+---
+title: "Project 1"
+author: "Hamish222"
+date: "April 10, 2016"
+output: html_document
+---
+
+## Part 1 - Loading and Preprocessing the Data
+
+```{r}
+data <- read.csv("activity.csv")
+```
+
+## Part 2 - What is the mean total number of steps taken per day?
+
+Total the number of steps by date and remove missing values.  Then produce a histogram of the resulting number of steps per day.
+
+```{r}
+data <- read.csv("activity.csv")
+totalByDay <- tapply(data$steps, data$date, FUN=sum, na.rm=TRUE)
+hist(totalByDay,xlab="Number of Steps per Day", main="Original Data Ignoring NAs")
+```
+
+The mean and median steps taken by day are as follows.
+
+```{r}
+avg=mean(totalByDay)
+mid=median(totalByDay)
+print(c(avg,mid))
+```
+
+## Part 3 - What is the average daily activity pattern?
+
+Compute the average number of steps by time interval and plot the result.
+```{r}
+averageByInterval <- tapply(data$steps, data$interval, FUN=mean, na.rm=TRUE)
+intervals <- unique(data$interval)
+plot(intervals, averageByInterval, type="l", xlab="Interval", ylab="Average Number of Steps")
+
+```
+
+Compute the interval where the maximum average occurs.
+
+```{r}
+intervals[averageByInterval==max(averageByInterval)]
+```
+
+We see that the maximum occurs in the interval labeled 835.
+
+## Part 4 - Impute missing values
+
+Find the rows that contain missing data.  (Note that all of the NAs occur in the 'steps' variable.)  Then compute the number of missing values.
+
+```{r}
+naRows <- is.na(data$steps)
+sum(naRows)  # Number of rows containing NA.
+```
+
+We see that there are 2304 missing values.
+
+Now we generate a new data frame that is the same as the original except that missing values are replaced with the corresponding interval average.
+
+```{r}
+imputedData <- data
+for (row in 1:length(imputedData$interval))
+  {
+  if (is.na(imputedData$steps[row]))
+    {
+    imputedData$steps[row] <- averageByInterval[match(imputedData$interval[row],intervals)]
+    }
+}
+```
+
+Generate a histogram showing the total number of steps taken per day using the data with imputed values.  Comparing the histogram below with the one above shows that imputing interval means for the missing values has a significant effect on the distribution.  In particular, it makes the distribution more symmetric.
+
+```{r}
+imputedTotalByDay <- tapply(imputedData$steps, imputedData$date, FUN=sum, na.rm=TRUE)
+hist(imputedTotalByDay,xlab="Number of Steps per Day", main="Data with Imputed Values")
+```
+
+The new mean and median are as follows.  Note that, unlike above, the mean and median are the same here and they are both larger than above.
+
+```{r}
+imputedAvg=mean(imputedTotalByDay)
+imputedMid=median(imputedTotalByDay)
+print(c(imputedAvg,imputedMid))
+```
+
+## Part 5 - Are there differences in activity patterns between weekdays and weekends?
+
+Using the data with the NAs removed, we append a new factor variable that indicates whether the measurements were made on a weekday or a weekend.
+
+```{r}
+convertDay2Type <- function(day){
+  dayList <- c("Sunday","Monday", "Tuesday", "Wednesday", "Thursday", "Friday","Saturday")
+  typeList <- c("weekend","weekday","weekday","weekday","weekday","weekday","weekend")
+  typeList[match(day,dayList)]
+}
+dayOfWeek <- weekdays(as.Date(data$date))  # Find which day
+imputedData$typeofday <- as.factor(convertDay2Type(dayOfWeek))  # Append the type of day to the new dat aframe with the imputed values
+```
+
+Generate a new data frame for plotting purposes.  The data frame contains average steps by interval and type of day of the week.
+
+```{r}
+temp <- imputedData[imputedData$typeofday=="weekday",]
+averageByIntervalWeekdays <- tapply(temp$steps, temp$interval, FUN=mean, na.rm=TRUE)
+temp <- imputedData[imputedData$typeofday=="weekend",]
+averageByIntervalWeekends <- tapply(temp$steps, temp$interval, FUN=mean, na.rm=TRUE)
+df <- data.frame(avgstep=c(averageByIntervalWeekdays,averageByIntervalWeekends), interval=c(intervals,intervals), typeofday=c(rep("weekday",length(averageByIntervalWeekdays)),rep("weekend",length(averageByIntervalWeekends))))
+
+```
+
+Compare the average number of steps per interval by type of day.  I give two similar plots for this. The first is better for comparing the heights of the graph, and the second is better for comparing the timing of features.
+
+```{r}
+library(ggplot2)
+q <- qplot(interval, avgstep, data=df, facets = . ~ typeofday) + geom_line() + labs(x="Interval",y="Average Number of Steps") 
+print(q)
+q <- qplot(interval, avgstep, data=df, facets = typeofday ~ .) + geom_line() + labs(x="Interval",y="Average Number of Steps") 
+print(q)
+```
+
